@@ -1,3 +1,24 @@
+"""
+DESCRIPTION
+Script that will create ACLs of any number rules that you want with any SRC IP and subnet range you want.
+Set permit/deny
+set the destination network if you like, else defaults to any/any
+
+examples:
+create 10 rule ACL on the switch called s7282 starting with 1.2.3.4/32
+python3 aclbuild.py -s s7282 -i 1.2.3.4 -m 32 -n testacl -r 10 -a deny
+ 
+create 10 rule ACL on the switch called s7282 starting with 1.2.3.4/22 to a specific network
+note that the script will correct 1.2.3.4 to a valid network address
+python3 aclbuild.py -s s7282 -i 1.2.3.4 -m 22 -n testacl -r 10 -a deny -d 100.1.2.0 -M 24
+
+Ask for help
+python3 aclbuild.py -h
+python3 aclbuild.py --help
+"""
+
+__author__ = 'Mike Furby (mfurby@arista.com)'
+
 import sys
 import pyeapi
 import pprint
