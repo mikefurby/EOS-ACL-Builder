@@ -54,3 +54,6 @@ ip access-list testacl
    430 deny ip 1.2.32.0/22 100.1.2.0/24
    440 deny ip 1.2.36.0/22 100.1.2.0/24
    450 permit ip any any
+   
+   
+   Then look at the associated aclremove.py which just removes an ACL names in the script arguements.
