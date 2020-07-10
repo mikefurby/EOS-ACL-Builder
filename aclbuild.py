@@ -1,13 +1,13 @@
-#!/usr/bin/python
 import sys
 import pyeapi
 import pprint
 import json
 import time
+import argparse
 
+def acl_loop(acln,src,mask,maxrules,action,dst,dmask,node):
+    print (acln,src,mask,maxrules,action,dst,dmask,node)
 
-def acl_loop(acln,maxrules,src,mask):
-    print (acln)
     a_low_address = int(src.split(".")[0])
     b_low_address = int(src.split(".")[1])
     c_low_address = int(src.split(".")[2])
@@ -35,19 +35,20 @@ def acl_loop(acln,maxrules,src,mask):
 ##ensures that the input source address is a valid subnet for the mask used
 ##it doesn't matter if it isn't because EOS converts to a valid network address
 ##However, it is nice to fix it anyway.
+    print ("checking address")
     if mask <= 32:
-        net = (d_low_address / blocksize[d_index])        
-        d_low_address = (net * blocksize[d_index])         
+        net = (int(d_low_address / blocksize[d_index]))        
+        d_low_address = int(net * blocksize[d_index])         
     if mask <= 24:
-        net = (c_low_address / blocksize[c_index])        
-        c_low_address = (net * blocksize[c_index])         
+        net = (int(c_low_address / blocksize[c_index]))        
+        c_low_address = int(net * blocksize[c_index])         
     if mask <= 16:
-        net = (b_low_address / blocksize[b_index])        
-        b_low_address = (net * blocksize[b_index])         
+        net = (int(b_low_address / blocksize[b_index]))        
+        b_low_address = int(net * blocksize[b_index])         
     if mask <= 8:
-        net = (a_low_address / blocksize[a_index])        
-        a_low_address = (net * blocksize[a_index])         
-#    print (a_low_address, b_low_address, c_low_address, d_low_address, mask)
+        net = (int(a_low_address / blocksize[a_index]))        
+        a_low_address = int(net * blocksize[a_index])         
+    print (a_low_address, b_low_address, c_low_address, d_low_address, mask)
 #    time.sleep(60)
 
     acls = node.api('acl')
@@ -90,13 +91,15 @@ def acl_loop(acln,maxrules,src,mask):
                     if rule_count > maxrules:
                         print ("break")
                         break
+
                     cba = (str(block_a) + ".")
                     cbb = (str(block_b) + ".")
                     cbc = (str(block_c) + ".")
                     cbd = (str(block_d))
+
                     src_ip = (cba + cbb + cbc + cbd)
-                    acls.add_entry(acln,"deny","ip",src_ip,mask,"0.0.0.0","0")
-                    print (acln,"deny","ip",src_ip,mask,"0.0.0.0","0")
+                    acls.add_entry(acln,action,"ip",src_ip,mask,dst,dmask)
+                    print (acln,action,"ip",src_ip,mask,dst,dmask)
 
                     if mask >= 24:
                       block_d += (blocksize[d_index])
@@ -122,20 +125,52 @@ def acl_loop(acln,maxrules,src,mask):
     acls.add_entry(acln,"permit","ip","0.0.0.0","0","0.0.0.0","0")
     print (acln,"permit","ip","0.0.0.0","0","0.0.0.0","0")
 
+def connect_to_switch(node):
+# add stuff here for switch queries if you want, otherwise it doesn't do much
+    print (node.enable('show hostname'))
 
-####main
-if len( sys.argv ) <= 5:   #check the arguements into the script
-    sys.stderr.write("example syntax, one arguement is required \n")
-    sys.stderr.write("./aclbuild1 <hostname> <ACL_name> <ip_src> <netmask> <#rules>\n")
-    sys.exit(1)
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-s", "--switch", required=True,
+        help="Switch Hostname as input into .eapi.conf in the root directory")
+    ap.add_argument("-n", "--name", required=True,
+        help="Name of the ACL")
+    ap.add_argument("-i", "--ipsrc", required=True,
+        help="First IP address in the ACL")
+    ap.add_argument("-m", "--mask", required=True,
+        help="Subnet mask")
+    ap.add_argument("-r", "--rules", required=True,
+        help="Number of rules to add")
+    ap.add_argument("-a", "--action", required=True,
+        help="Rule action = 'permit' or 'deny'")
+    ap.add_argument("-d", "--ipdst", required=False,
+        help="Destination IP, default = 0.0.0.0")
+    ap.add_argument("-M", "--dmask", required=False,
+        help="Destination Mask, default = 0")
+    args = vars(ap.parse_args())
 
-hostname = sys.argv[1]         #i.e. cal362 or s70512
-acl_name = sys.argv[2]         #i.e. port_mirror_acl1
-first_src = sys.argv[3]        #i.e. 1.1.1.0
-src_netmask = int(sys.argv[4]) #i.e. 24
-max_rules = int(sys.argv[5])   #i.e. 100
+    hostname = (args['switch'])
+    acl_name = (args['name'])
+    first_src = (args['ipsrc'])
+    src_netmask = int(args['mask'])
+    max_rules = int(args['rules'])
+    rule_action = (args['action'])
 
-node = pyeapi.connect_to(hostname)       #needs the .eapi.conf file in the /home/ directory
-print (node.enable('show hostname'))     #just use eapi to get the hostname and confirm connectivity
-acl_loop(acl_name,max_rules,first_src,src_netmask)     #use the function abover to do the ACL
-# the end
+    try:
+        dst_ip = (args['ipdst'])
+        dst_mask = int(args['dmask'])
+    except:
+        dst_ip = '0.0.0.0'
+        dst_mask = 0
+
+    try:
+        node = pyeapi.connect_to(hostname)       #needs the .eapi.conf file in the /home/ directory
+        connect_to_switch(node)
+        acl_loop(acl_name,first_src,src_netmask,max_rules,rule_action,dst_ip,dst_mask,node)
+    except:
+        print ("Execution Failed:")
+        print ("check the .eapi.conf file for the correct hostname")
+
+
+if __name__ == '__main__':
+    main()
